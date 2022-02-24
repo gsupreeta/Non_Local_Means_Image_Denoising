@@ -1,4 +1,4 @@
-# CMakeList.txt : CMake project for Opencl-ex1, include source and define
+﻿# CMakeList.txt : CMake project for Opencl-ex1, include source and define
 # project specific logic here.
 #
 cmake_minimum_required (VERSION 3.8)
@@ -36,4 +36,3 @@ target_link_libraries (Opencl-ex1 ${OpenCL_LIBRARY} imagehlp )
 target_link_libraries (Opencl-ex1 ${OpenCV_LIBS})
 
 # TODO: Add tests and install targets if needed.
-
