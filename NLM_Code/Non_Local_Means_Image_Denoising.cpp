@@ -21,15 +21,11 @@
 #include <OpenCL/Device.hpp>
 #include <boost/lexical_cast.hpp>
 #include <opencv2/opencv.hpp>
-//#ifdef _APPLE_
-//#include <OpenCL/cl.h>
-//#else
-//#include <CL\cl.h>
-////#include <CL\cl.hpp>
-//#endif
 #include <opencv2/photo.hpp>
 #pragma warning( disable : 4996 )
 
+/* Preprocessor directive to select the Grey NLM implementation or RGB NLM implementation  */
+/* Comment "GreyDenoise" and uncomment "RGBDenoise" for RGB implementation */
 #define GreyDenoise
 //#define RGBDenoise
 
@@ -178,7 +174,7 @@ int main(int argc, char** argv) {
 	cl_sampler sampler = 0;
 
 	//kernel file
-	const char* cl_kernel_file = "C:/Users/gsupr/Downloads/Opencl-Basics-Windows (1)/Opencl-Basics-Windows/Opencl-ex1/src/Non_Local_Means_Image_Denoising.cl";
+	const char* cl_kernel_file = "C:/Users/gsupr/Downloads/Opencl-Basics-Windows (1)/Opencl-Basics-Windows/Opencl-ex1/src/Non_Local_Means_Image_Denoising_upload.cl";
 
 	//Get platform details
 	errNum = clGetPlatformIDs(1, &platformId, &platforms);
@@ -214,7 +210,7 @@ int main(int argc, char** argv) {
 		cerr << "OpenCL device does not support the image" << endl;
 
 
-/////////////////////////////////Greyscale Implementation ////////////////////////////////
+	/////////////////////////////////Greyscale Implementation ////////////////////////////////
 #ifdef  GreyDenoise
 
 	// Declare some values
@@ -236,22 +232,10 @@ int main(int argc, char** argv) {
 	memset(h_outputCpu.data(), 255, size);
 
 	// Allocate space for input and output data on the device
-	std::size_t image_width = 640, image_Height = 480;
+	std::size_t image_width;
+	std::size_t image_Height;
 	std::vector<float> inputData;
 	int patchWidth = 3;
-
-	cl_mem g_image = clCreateBuffer(context, CL_MEM_READ_WRITE, image_width * image_Height * sizeof(float), NULL, &errNum);
-	cl_mem g_imageTemp1 = clCreateBuffer(context, CL_MEM_READ_WRITE, image_width * image_Height * sizeof(float), NULL, &errNum);
-	cl_mem g_imageTemp2 = clCreateBuffer(context, CL_MEM_READ_WRITE, image_width * image_Height * sizeof(float), NULL, &errNum);
-
-	// GPU Write Buffer
-	errNum = clEnqueueWriteBuffer(commandQueue, g_imageTemp1, CL_TRUE, 0, image_width * image_Height * sizeof(float), h_outputGpu.data(), 0, NULL, NULL);
-	errNum = clEnqueueWriteBuffer(commandQueue, g_imageTemp2, CL_TRUE, 0, image_width * image_Height * sizeof(float), h_outputGpu.data(), 0, NULL, NULL);
-	if (errNum != CL_SUCCESS)
-	{
-		cerr << "Error writing buffer" << endl;
-		return 1;
-	}
 
 	// Load input data 
 	string src = "C:/Users/gsupr/Downloads/Opencl-Basics-Windows (1)/Opencl-Basics-Windows/Opencl-ex1/src/Greyscale_raw_noisy_image.pgm";
@@ -261,6 +245,25 @@ int main(int argc, char** argv) {
 			h_input[i + j * image_width] = inputData[(i % image_width) + (j % image_Height) * image_width];
 		}
 	}
+
+	cl_mem g_image = clCreateBuffer(context, CL_MEM_READ_WRITE, image_width * image_Height * sizeof(float), NULL, &errNum);
+	cl_mem g_imageTemp1 = clCreateBuffer(context, CL_MEM_READ_WRITE, image_width * image_Height * sizeof(float), NULL, &errNum);
+	cl_mem g_imageTemp2 = clCreateBuffer(context, CL_MEM_READ_WRITE, image_width * image_Height * sizeof(float), NULL, &errNum);
+	cl_mem cl_width = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(cl_mem), NULL, &errNum);
+	cl_mem cl_height = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(cl_mem), NULL, &errNum);
+
+	// GPU Write Buffer
+	errNum = clEnqueueWriteBuffer(commandQueue, g_imageTemp1, CL_TRUE, 0, image_width * image_Height * sizeof(float), h_outputGpu.data(), 0, NULL, NULL);
+	errNum = clEnqueueWriteBuffer(commandQueue, g_imageTemp2, CL_TRUE, 0, image_width * image_Height * sizeof(float), h_outputGpu.data(), 0, NULL, NULL);
+	errNum = clEnqueueWriteBuffer(commandQueue, cl_width, CL_TRUE, 0, sizeof(int), (void*)&image_width, 0, NULL, NULL);
+	errNum = clEnqueueWriteBuffer(commandQueue, cl_height, CL_TRUE, 0, sizeof(int), (void*)&image_Height, 0, NULL, NULL);
+
+	if (errNum != CL_SUCCESS)
+	{
+		cerr << "Error writing buffer" << endl;
+		return 1;
+	}
+
 
 	// Copy input data to device
 	errNum = clEnqueueWriteBuffer(commandQueue, g_image, CL_TRUE, 0, image_width * image_Height * sizeof(float), h_input.data(), 0, NULL, NULL);
@@ -309,7 +312,7 @@ int main(int argc, char** argv) {
 		clReleaseProgram(program);
 		return NULL;
 	}
-	
+
 	//create kernel object
 	cout << "\nExecuting Greyscale device implementation" << endl;
 	kernel = clCreateKernel(program, "NonLocalMeansFilter_Greyscale", NULL);
@@ -323,6 +326,9 @@ int main(int argc, char** argv) {
 	errNum = clSetKernelArg(kernel, 0, sizeof(cl_mem), &g_image);
 	errNum = clSetKernelArg(kernel, 1, sizeof(cl_mem), &g_imageTemp1);
 	errNum = clSetKernelArg(kernel, 2, sizeof(cl_mem), &g_imageTemp2);
+	errNum = clSetKernelArg(kernel, 3, sizeof(cl_mem), &cl_width);
+	errNum = clSetKernelArg(kernel, 4, sizeof(cl_mem), &cl_height);
+
 	if (errNum != CL_SUCCESS)
 	{
 		cerr << "Error setting kernel arguments" << endl;
@@ -331,7 +337,7 @@ int main(int argc, char** argv) {
 
 	//Launching kernel on device
 	size_t globalWorkOffset[2] = { image_Height, image_width };
-	size_t localWorkOffset[2] = { 8 , 8};
+	size_t localWorkOffset[2] = { 8 , 8 };
 	errNum = clEnqueueNDRangeKernel(commandQueue, kernel, 2, NULL, globalWorkOffset, localWorkOffset, 0, NULL, NULL);
 	if (errNum != CL_SUCCESS)
 	{
@@ -395,7 +401,7 @@ int main(int argc, char** argv) {
 
 	//Load image from file
 	int width, height;
-	string src = "C:/images/Color_raw_noisy_image.bmp";		
+	string src = "C:/images/Color_raw_noisy_image.bmp";
 
 	//GPU function call for loading color image
 	source_image = GetRGBImage(context, src, width, height);
@@ -521,7 +527,7 @@ int main(int argc, char** argv) {
 
 	// CPU function calls RGB images
 	NLM_RGB_CPU(src);
-	
+
 	//Creating output color images
 	cv::Mat gpuColor = cv::imread(src);
 	cv::Mat gpuColor1 = cv::imread(src);
