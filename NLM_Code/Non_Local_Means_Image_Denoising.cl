@@ -41,7 +41,7 @@ __kernel void NonLocalMeansFilter_Greyscale(__global float* input_image, __globa
 	const int local_x = get_local_id(0);
 
 	//Search window loop to find the difference between two pixels over the image
-	for (int local_y = 0; local_y < image_width - smallwindow + 1; local_y++)
+	for (int local_y = 0; local_y < image_width; local_y++)
 	{
 		float dist = 0;
 		float Finaldist = 0;
