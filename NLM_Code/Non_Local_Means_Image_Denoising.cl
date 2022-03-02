@@ -62,8 +62,6 @@ __kernel void NonLocalMeansFilter_Greyscale(__global float* input_image, __globa
 		// Multiplying the weights with original input pixels
 		input_Temp1[xdir * image_width + ydir] += weight * input_image[local_x * image_width + local_y];
 		input_Temp2[xdir * image_width + ydir] += weight;
-		input_Temp1[local_x * image_width + local_y] += weight * input_image[xdir * image_width + ydir];
-		input_Temp2[local_x * image_width + local_y] += weight;
 	}
 }
 
