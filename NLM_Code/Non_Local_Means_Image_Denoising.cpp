@@ -397,7 +397,7 @@ int main(int argc, char** argv) {
 	cl_mem cl_sigma = NULL;
 
 	float nlmsigma = 1.0f / (sigma * sigma);
-	float filt = 0.2f;
+	float filt = 0.5f;
 
 	//Load image from file
 	int width, height;
